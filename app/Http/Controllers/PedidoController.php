@@ -8,6 +8,8 @@ use App\Models\Pedido;
 use Illuminate\Http\Request;
 use App\Http\Requests\StorePedidoRequest;
 use App\Http\Requests\UpdatePrioridadRequest;
+use App\Http\Requests\UpdateNotaRequest;
+use App\Http\Requests\UpdateDireccionRequest;
 use Carbon\Carbon;
 
 class PedidoController extends Controller
@@ -15,9 +17,19 @@ class PedidoController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $pedidos = Pedido::with('cliente')->get();
+        $query = Pedido::with('cliente');
+
+        if ($request->has('desde')) {
+            $query->whereDate('fecha_pedido', '>=', $request->query('desde'));
+        }
+
+        if ($request->has('hasta')) {
+            $query->whereDate('fecha_pedido', '<=', $request->query('hasta'));
+        }
+
+        $pedidos = $query->orderBy('fecha_pedido', 'desc')->get();
 
         return response()->json($pedidos);
     }
@@ -114,6 +126,25 @@ class PedidoController extends Controller
         return response()->json($pedidos);
     }
 
+    public function pendientes()
+    {
+        $pedidos = Pedido::with('cliente')
+            ->where('estado', 'Pendiente')
+            ->get();
+
+        return response()->json($pedidos);
+    }
+
+    public function pedidosPorPrioridad($nivel)
+    {
+        $pedidos = Pedido::with('cliente')
+            ->where('prioridad', $nivel)
+            ->orderBy('fecha_pedido', 'asc')
+            ->get();
+
+        return response()->json($pedidos);
+    }
+
     public function priorizados()
     {
         $pedidos = Pedido::with('cliente')
@@ -154,6 +185,32 @@ class PedidoController extends Controller
 
         return response()->json([
             "mensaje" => "Prioridad actualizada",
+            "pedido" => $pedido
+        ]);
+    }
+
+    public function actualizarNota(UpdateNotaRequest $request, $id)
+    {
+        $pedido = Pedido::findOrFail($id);
+
+        $pedido->nota = $request->nota;
+        $pedido->save();
+
+        return response()->json([
+            "mensaje" => "Nota actualizada",
+            "pedido" => $pedido
+        ]);
+    }
+
+    public function actualizarDireccion(UpdateDireccionRequest $request, $id)
+    {
+        $pedido = Pedido::findOrFail($id);
+
+        $pedido->direccion_entrega = $request->direccion_entrega;
+        $pedido->save();
+
+        return response()->json([
+            "mensaje" => "Dirección actualizada",
             "pedido" => $pedido
         ]);
     }

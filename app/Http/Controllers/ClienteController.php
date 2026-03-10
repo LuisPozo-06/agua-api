@@ -82,4 +82,10 @@ class ClienteController extends Controller
 
         return response()->json($pedidos);
     }
+
+    public function buscarPorTelefono(string $telefono)
+    {
+        $cliente = Cliente::where('telefono', $telefono)->firstOrFail();
+        return response()->json($cliente);
+    }
 }
