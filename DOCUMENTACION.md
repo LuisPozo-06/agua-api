@@ -95,10 +95,9 @@ El sistema sigue el patrón de diseño **MVC (Modelo-Vista-Controlador)** adapta
 5. **Cierre**: Una vez entregado, el pedido se marca como tal y se refleja en las estadísticas globales.
 
 ## 11. Estado Actual del Desarrollo
-El sistema se encuentra en una fase **funcional y estable para operaciones base**. Se han integrado todas las reglas de negocio críticas como la no duplicidad de clientes y la persistencia de datos históricos mediante borrado lógico.
+El sistema se encuentra en una fase **funcional y estable para operaciones base**. Se han integrado todas las reglas de negocio críticas como la no duplicidad de clientes y la persistencia de datos históricos mediante borrado lógico. Además, la **Autenticación con Laravel Sanctum** ha sido implementada exitosamente para asegurar todos los endpoints de acceso a datos.
 
 ## 12. Próximos Pasos
-1. **Autenticación**: Implementar Laravel Sanctum o JWT para proteger los endpoints.
-2. **Reportes**: Generación de reportes PDF/Excel de pedidos por rango de fechas.
-3. **Notificaciones**: Sistema de alertas vía correo o SMS para cambios en el estado del pedido.
-4. **Logs de Auditoría**: Registro de quién realizó cambios en los estados de los pedidos.
+1. **Reportes**: Generación de reportes PDF/Excel de pedidos por rango de fechas.
+2. **Notificaciones**: Sistema de alertas vía correo o SMS para cambios en el estado del pedido.
+3. **Logs de Auditoría**: Registro de quién realizó cambios en los estados de los pedidos.

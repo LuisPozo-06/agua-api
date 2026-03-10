@@ -74,4 +74,12 @@ class ClienteController extends Controller
             "mensaje" => "Cliente eliminado correctamente"
         ]);
     }
+
+    public function pedidos(string $id)
+    {
+        $cliente = Cliente::findOrFail($id);
+        $pedidos = $cliente->pedidos()->orderBy('fecha_pedido', 'desc')->get();
+
+        return response()->json($pedidos);
+    }
 }

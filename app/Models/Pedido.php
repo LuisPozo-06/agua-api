@@ -14,7 +14,8 @@ class Pedido extends Model
         'direccion_entrega',
         'prioridad',
         'estado',
-        'fecha_pedido'
+        'fecha_pedido',
+        'nota',
     ];
 
     public function cliente()

@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Pedido;
 use Illuminate\Http\Request;
 use App\Http\Requests\StorePedidoRequest;
+use App\Http\Requests\UpdatePrioridadRequest;
+use Carbon\Carbon;
+
 class PedidoController extends Controller
 {
     /**
@@ -110,6 +113,25 @@ class PedidoController extends Controller
 
         return response()->json($pedidos);
     }
+
+    public function priorizados()
+    {
+        $pedidos = Pedido::with('cliente')
+            ->orderBy('prioridad', 'asc')
+            ->orderBy('fecha_pedido', 'asc')
+            ->get();
+
+        return response()->json($pedidos);
+    }
+
+    public function hoy()
+    {
+        $pedidos = Pedido::with('cliente')
+            ->whereDate('fecha_pedido', Carbon::today())
+            ->get();
+
+        return response()->json($pedidos);
+    }
     public function actualizarEstado(Request $request, $id)
     {
         $pedido = Pedido::findOrFail($id);
@@ -119,6 +141,32 @@ class PedidoController extends Controller
 
         return response()->json([
             "mensaje" => "Estado actualizado",
+            "pedido" => $pedido
+        ]);
+    }
+
+    public function actualizarPrioridad(UpdatePrioridadRequest $request, $id)
+    {
+        $pedido = Pedido::findOrFail($id);
+
+        $pedido->prioridad = $request->prioridad;
+        $pedido->save();
+
+        return response()->json([
+            "mensaje" => "Prioridad actualizada",
+            "pedido" => $pedido
+        ]);
+    }
+
+    public function cancelar($id)
+    {
+        $pedido = Pedido::findOrFail($id);
+
+        $pedido->estado = 'Cancelado';
+        $pedido->save();
+
+        return response()->json([
+            "mensaje" => "Pedido cancelado",
             "pedido" => $pedido
         ]);
     }
