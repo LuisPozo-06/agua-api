@@ -214,6 +214,8 @@ class PedidoController extends Controller
     {
         $pedidos = Pedido::with('cliente')
             ->where('estado', 'Pendiente')
+            ->orderBy('prioridad', 'asc')
+            ->orderBy('fecha_pedido', 'asc')
             ->get();
 
         return response()->json($pedidos);
@@ -265,6 +267,8 @@ class PedidoController extends Controller
     {
         $pedidos = Pedido::with('cliente')
             ->whereDate('fecha_pedido', Carbon::today())
+            ->orderBy('prioridad', 'asc')
+            ->orderBy('fecha_pedido', 'asc')
             ->get();
 
         return response()->json($pedidos);
@@ -291,12 +295,103 @@ class PedidoController extends Controller
     {
         $pedido = Pedido::findOrFail($id);
         $pedido->estado = $request->estado;
+        $pedido->estado_updated_at = now();
         $pedido->save();
 
         return response()->json([
             "mensaje" => "Estado actualizado",
             "pedido" => $pedido
         ]);
+    }
+
+    #[OA\Put(
+        path: "/api/pedidos/{id}/estado-pago",
+        summary: "Actualiza el estado de pago del pedido",
+        security: [["sanctum" => []]],
+        tags: ["Pedidos"]
+    )]
+    #[OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "integer"))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["estado_pago"],
+            properties: [
+                new OA\Property(property: "estado_pago", type: "string", example: "Pagado")
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: "Estado de pago actualizado")]
+    public function actualizarEstadoPago(Request $request, $id)
+    {
+        $request->validate([
+            'estado_pago' => 'required|in:Pendiente,Pagado'
+        ]);
+
+        $pedido = Pedido::findOrFail($id);
+        $pedido->estado_pago = $request->estado_pago;
+        $pedido->estado_pago_updated_at = now();
+        $pedido->save();
+
+        return response()->json([
+            "mensaje" => "Estado de pago actualizado",
+            "pedido" => $pedido
+        ]);
+    }
+
+    #[OA\Post(
+        path: "/api/pedidos/{id}/comprobante",
+        summary: "Guardar URL del comprobante de pago (Cloudinary)",
+        security: [["sanctum" => []]],
+        tags: ["Pedidos"]
+    )]
+    #[OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "integer"))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["comprobante_url"],
+            properties: [
+                new OA\Property(property: "comprobante_url", type: "string", example: "https://res.cloudinary.com/demo/image/upload/v123/abc.jpg")
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: "URL del comprobante guardada")]
+    public function guardarComprobante(Request $request, $id)
+    {
+        $request->validate([
+            'comprobante_url' => 'required|url|max:500'
+        ]);
+
+        $pedido = Pedido::findOrFail($id);
+        $pedido->comprobante_url = $request->comprobante_url;
+        // Si aún está pendiente, marcamos como pagado automáticamente
+        if ($pedido->estado_pago === 'Pendiente') {
+            $pedido->estado_pago = 'Pagado';
+            $pedido->estado_pago_updated_at = now();
+        }
+        $pedido->save();
+
+        return response()->json([
+            "mensaje" => "Comprobante guardado",
+            "pedido" => $pedido
+        ]);
+    }
+
+    #[OA\Get(
+        path: "/api/pedidos/pago-pendiente",
+        summary: "Listar pedidos con pago pendiente",
+        security: [["sanctum" => []]],
+        tags: ["Pedidos"]
+    )]
+    #[OA\Response(response: 200, description: "Lista de pedidos con pago pendiente")]
+    public function pagoPendiente()
+    {
+        $pedidos = Pedido::with('cliente')
+            ->where('estado_pago', 'Pendiente')
+            ->orderBy('prioridad', 'asc')
+            ->orderBy('fecha_pedido', 'asc')
+            ->get();
+
+        return response()->json($pedidos);
     }
 
     #[OA\Put(

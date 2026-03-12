@@ -14,8 +14,18 @@ class Pedido extends Model
         'direccion_entrega',
         'prioridad',
         'estado',
+        'estado_updated_at',
         'fecha_pedido',
         'nota',
+        'estado_pago',
+        'estado_pago_updated_at',
+        'comprobante_url',
+    ];
+
+    protected $casts = [
+        'estado_updated_at'      => 'datetime',
+        'estado_pago_updated_at' => 'datetime',
+        'fecha_pedido'           => 'datetime',
     ];
 
     public function cliente()

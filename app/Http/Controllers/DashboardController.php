@@ -31,12 +31,14 @@ class DashboardController extends Controller
         $pendientes = Pedido::where('estado', 'Pendiente')->count();
         $proceso = Pedido::where('estado', 'En proceso')->count();
         $entregados = Pedido::where('estado', 'Entregado')->count();
+        $pagos_pendientes = Pedido::where('estado_pago', 'Pendiente')->count();
         $total = Pedido::count();
 
         return response()->json([
             "pedidos_pendientes" => $pendientes,
             "pedidos_proceso" => $proceso,
             "pedidos_entregados" => $entregados,
+            "pagos_pendientes" => $pagos_pendientes,
             "total_pedidos" => $total
         ]);
     }
