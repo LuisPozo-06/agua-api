@@ -27,7 +27,12 @@ class ClienteTest extends TestCase
             ->getJson('/api/clientes');
 
         $response->assertStatus(200)
-            ->assertJsonCount(3);
+            ->assertJsonStructure([
+                'data',
+                'meta' => ['current_page', 'per_page', 'total', 'last_page']
+            ]);
+
+        $this->assertCount(3, $response->json('data'));
     }
 
     public function test_create_cliente(): void

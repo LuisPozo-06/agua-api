@@ -1,24 +1,46 @@
 <?php
 
 namespace App\Http\Controllers;
-use App\Http\Controllers\Controller;
+
 use App\Models\Cliente;
+use App\Services\ClienteService;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
 class ClienteController extends Controller
 {
+    protected ClienteService $clienteService;
+
+    public function __construct(ClienteService $clienteService)
+    {
+        $this->clienteService = $clienteService;
+    }
+
     #[OA\Get(
         path: "/api/clientes",
         summary: "Listar todos los clientes",
         security: [["sanctum" => []]],
         tags: ["Clientes"]
     )]
+    #[OA\Parameter(name: "page", in: "query", required: false, description: "Número de página", schema: new OA\Schema(type: "integer", example: 1))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, description: "Registros por página", schema: new OA\Schema(type: "integer", example: 10))]
     #[OA\Response(response: 200, description: "Operación exitosa")]
-    public function index()
+    public function index(Request $request)
     {
-        $clientes = Cliente::all();
-        return response()->json($clientes);
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
+
+        $clientes = $this->clienteService->getAll($perPage);
+
+        return response()->json([
+            'data' => $clientes->items(),
+            'meta' => [
+                'current_page' => $clientes->currentPage(),
+                'per_page' => $clientes->perPage(),
+                'total' => $clientes->total(),
+                'last_page' => $clientes->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Post(
@@ -48,12 +70,7 @@ class ClienteController extends Controller
             'direccion' => 'required|string|max:255'
         ]);
 
-        $cliente = Cliente::create([
-            'nombre' => $request->nombre,
-            'telefono' => $request->telefono,
-            'direccion' => $request->direccion
-        ]);
-
+        $cliente = $this->clienteService->create($request->all());
         return response()->json($cliente, 201);
     }
 
@@ -68,7 +85,12 @@ class ClienteController extends Controller
     #[OA\Response(response: 404, description: "Cliente no encontrado")]
     public function show(string $id)
     {
-        $cliente = Cliente::findOrFail($id);
+        $cliente = $this->clienteService->findById($id);
+        
+        if (!$cliente) {
+            return response()->json(['mensaje' => 'Cliente no encontrado'], 404);
+        }
+
         return response()->json($cliente);
     }
 
@@ -102,7 +124,7 @@ class ClienteController extends Controller
             'direccion' => 'sometimes|string|max:255'
         ]);
 
-        $cliente->update($request->all());
+        $cliente = $this->clienteService->update($cliente, $request->all());
         return response()->json($cliente);
     }
 
@@ -118,7 +140,7 @@ class ClienteController extends Controller
     public function destroy(string $id)
     {
         $cliente = Cliente::findOrFail($id);
-        $cliente->delete();
+        $this->clienteService->delete($cliente);
 
         return response()->json([
             "mensaje" => "Cliente eliminado correctamente"
@@ -132,13 +154,31 @@ class ClienteController extends Controller
         tags: ["Clientes"]
     )]
     #[OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
     #[OA\Response(response: 200, description: "Lista de pedidos históricos")]
-    public function pedidos(string $id)
+    public function pedidos(Request $request, string $id)
     {
-        $cliente = Cliente::findOrFail($id);
-        $pedidos = $cliente->pedidos()->orderBy('fecha_pedido', 'desc')->get();
+        $cliente = $this->clienteService->findById($id);
+        
+        if (!$cliente) {
+            return response()->json(['mensaje' => 'Cliente no encontrado'], 404);
+        }
+        
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        return response()->json($pedidos);
+        $pedidos = $this->clienteService->getPedidos($cliente, $perPage);
+
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Get(
@@ -152,7 +192,12 @@ class ClienteController extends Controller
     #[OA\Response(response: 404, description: "Cliente no encontrado")]
     public function buscarPorTelefono(string $telefono)
     {
-        $cliente = Cliente::where('telefono', $telefono)->firstOrFail();
+        $cliente = $this->clienteService->findByTelefono($telefono);
+        
+        if (!$cliente) {
+            return response()->json(['mensaje' => 'Cliente no encontrado'], 404);
+        }
+
         return response()->json($cliente);
     }
 }

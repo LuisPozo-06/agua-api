@@ -3,42 +3,57 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
-use Illuminate\Support\Facades\DB;
 use App\Models\Pedido;
+use App\Services\PedidoService;
 use Illuminate\Http\Request;
 use App\Http\Requests\StorePedidoRequest;
 use App\Http\Requests\UpdatePrioridadRequest;
 use App\Http\Requests\UpdateNotaRequest;
 use App\Http\Requests\UpdateDireccionRequest;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class PedidoController extends Controller
 {
+    protected PedidoService $pedidoService;
+
+    public function __construct(PedidoService $pedidoService)
+    {
+        $this->pedidoService = $pedidoService;
+    }
+
     #[OA\Get(
         path: "/api/pedidos",
         summary: "Listar pedidos",
         security: [["sanctum" => []]],
         tags: ["Pedidos"]
     )]
+    #[OA\Parameter(name: "page", in: "query", required: false, description: "Número de página", schema: new OA\Schema(type: "integer", example: 1))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, description: "Registros por página", schema: new OA\Schema(type: "integer", example: 10))]
     #[OA\Parameter(name: "desde", in: "query", required: false, description: "Fecha de inicio (YYYY-MM-DD)", schema: new OA\Schema(type: "string", format: "date"))]
     #[OA\Parameter(name: "hasta", in: "query", required: false, description: "Fecha de fin (YYYY-MM-DD)", schema: new OA\Schema(type: "string", format: "date"))]
-    #[OA\Response(response: 200, description: "Lista de pedidos")]
+    #[OA\Response(response: 200, description: "Lista de pedidos paginada")]
     public function index(Request $request)
     {
-        $query = Pedido::with('cliente');
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        if ($request->has('desde')) {
-            $query->whereDate('fecha_pedido', '>=', $request->query('desde'));
-        }
+        $filters = [
+            'desde' => $request->query('desde'),
+            'hasta' => $request->query('hasta'),
+        ];
 
-        if ($request->has('hasta')) {
-            $query->whereDate('fecha_pedido', '<=', $request->query('hasta'));
-        }
+        $pedidos = $this->pedidoService->getAll($filters, $perPage);
 
-        $pedidos = $query->orderBy('fecha_pedido', 'desc')->get();
-
-        return response()->json($pedidos);
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Post(
@@ -63,16 +78,7 @@ class PedidoController extends Controller
     #[OA\Response(response: 201, description: "Pedido creado")]
     public function store(StorePedidoRequest $request)
     {
-        $pedido = Pedido::create([
-            'cliente_id' => $request->cliente_id,
-            'cantidad_agua' => $request->cantidad_agua,
-            'direccion_entrega' => $request->direccion_entrega,
-            'prioridad' => $request->prioridad,
-            'estado' => 'Pendiente',
-            'fecha_pedido' => now(),
-            'nota' => $request->nota
-        ]);
-
+        $pedido = $this->pedidoService->create($request->validated());
         return response()->json($pedido, 201);
     }
 
@@ -87,7 +93,12 @@ class PedidoController extends Controller
     #[OA\Response(response: 404, description: "Pedido no encontrado")]
     public function show($id)
     {
-        $pedido = Pedido::with('cliente')->findOrFail($id);
+        $pedido = $this->pedidoService->findById($id);
+        
+        if (!$pedido) {
+            return response()->json(['mensaje' => 'Pedido no encontrado'], 404);
+        }
+
         return response()->json($pedido);
     }
 
@@ -110,11 +121,7 @@ class PedidoController extends Controller
     public function update(Request $request, $id)
     {
         $pedido = Pedido::findOrFail($id);
-
-        $pedido->update([
-            'estado' => $request->estado
-        ]);
-
+        $pedido = $this->pedidoService->update($pedido, $request->only(['estado']));
         return response()->json($pedido);
     }
 
@@ -129,7 +136,7 @@ class PedidoController extends Controller
     public function destroy($id)
     {
         $pedido = Pedido::findOrFail($id);
-        $pedido->delete();
+        $this->pedidoService->delete($pedido);
 
         return response()->json([
             "mensaje" => "Pedido eliminado correctamente"
@@ -193,14 +200,25 @@ class PedidoController extends Controller
         tags: ["Pedidos"]
     )]
     #[OA\Parameter(name: "estado", in: "path", required: true, schema: new OA\Schema(type: "string", example: "Pendiente"))]
+    #[OA\Parameter(name: "page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
     #[OA\Response(response: 200, description: "Lista de pedidos filtrados")]
-    public function pedidosPorEstado($estado)
+    public function pedidosPorEstado(Request $request, $estado)
     {
-        $pedidos = Pedido::with('cliente')
-            ->where('estado', $estado)
-            ->get();
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        return response()->json($pedidos);
+        $pedidos = $this->pedidoService->getByEstado($estado, $perPage);
+
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Get(
@@ -209,16 +227,25 @@ class PedidoController extends Controller
         security: [["sanctum" => []]],
         tags: ["Pedidos"]
     )]
-    #[OA\Response(response: 200, description: "Sólo retorna pedidos pendientes")]
-    public function pendientes()
+    #[OA\Parameter(name: "page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Response(response: 200, description: "Pedidos pendientes paginados")]
+    public function pendientes(Request $request)
     {
-        $pedidos = Pedido::with('cliente')
-            ->where('estado', 'Pendiente')
-            ->orderBy('prioridad', 'asc')
-            ->orderBy('fecha_pedido', 'asc')
-            ->get();
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        return response()->json($pedidos);
+        $pedidos = $this->pedidoService->getPendientes($perPage);
+
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Get(
@@ -228,15 +255,25 @@ class PedidoController extends Controller
         tags: ["Pedidos"]
     )]
     #[OA\Parameter(name: "nivel", in: "path", required: true, schema: new OA\Schema(type: "integer", example: 1))]
+    #[OA\Parameter(name: "page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
     #[OA\Response(response: 200, description: "Lista filtrada")]
-    public function pedidosPorPrioridad($nivel)
+    public function pedidosPorPrioridad(Request $request, $nivel)
     {
-        $pedidos = Pedido::with('cliente')
-            ->where('prioridad', $nivel)
-            ->orderBy('fecha_pedido', 'asc')
-            ->get();
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        return response()->json($pedidos);
+        $pedidos = $this->pedidoService->getByPrioridad($nivel, $perPage);
+
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Get(
@@ -245,15 +282,25 @@ class PedidoController extends Controller
         security: [["sanctum" => []]],
         tags: ["Pedidos"]
     )]
+    #[OA\Parameter(name: "page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
     #[OA\Response(response: 200, description: "Pedidos ordenados")]
-    public function priorizados()
+    public function priorizados(Request $request)
     {
-        $pedidos = Pedido::with('cliente')
-            ->orderBy('prioridad', 'asc')
-            ->orderBy('fecha_pedido', 'asc')
-            ->get();
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        return response()->json($pedidos);
+        $pedidos = $this->pedidoService->getPriorizados($perPage);
+
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Get(
@@ -262,16 +309,25 @@ class PedidoController extends Controller
         security: [["sanctum" => []]],
         tags: ["Pedidos"]
     )]
+    #[OA\Parameter(name: "page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
     #[OA\Response(response: 200, description: "Pedidos de hoy")]
-    public function hoy()
+    public function hoy(Request $request)
     {
-        $pedidos = Pedido::with('cliente')
-            ->whereDate('fecha_pedido', Carbon::today())
-            ->orderBy('prioridad', 'asc')
-            ->orderBy('fecha_pedido', 'asc')
-            ->get();
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        return response()->json($pedidos);
+        $pedidos = $this->pedidoService->getHoy($perPage);
+
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Put(
@@ -294,9 +350,7 @@ class PedidoController extends Controller
     public function actualizarEstado(Request $request, $id)
     {
         $pedido = Pedido::findOrFail($id);
-        $pedido->estado = $request->estado;
-        $pedido->estado_updated_at = now();
-        $pedido->save();
+        $pedido = $this->pedidoService->actualizarEstado($pedido, $request->estado);
 
         return response()->json([
             "mensaje" => "Estado actualizado",
@@ -328,9 +382,7 @@ class PedidoController extends Controller
         ]);
 
         $pedido = Pedido::findOrFail($id);
-        $pedido->estado_pago = $request->estado_pago;
-        $pedido->estado_pago_updated_at = now();
-        $pedido->save();
+        $pedido = $this->pedidoService->actualizarEstadoPago($pedido, $request->estado_pago);
 
         return response()->json([
             "mensaje" => "Estado de pago actualizado",
@@ -362,13 +414,7 @@ class PedidoController extends Controller
         ]);
 
         $pedido = Pedido::findOrFail($id);
-        $pedido->comprobante_url = $request->comprobante_url;
-        // Si aún está pendiente, marcamos como pagado automáticamente
-        if ($pedido->estado_pago === 'Pendiente') {
-            $pedido->estado_pago = 'Pagado';
-            $pedido->estado_pago_updated_at = now();
-        }
-        $pedido->save();
+        $pedido = $this->pedidoService->guardarComprobante($pedido, $request->comprobante_url);
 
         return response()->json([
             "mensaje" => "Comprobante guardado",
@@ -382,16 +428,25 @@ class PedidoController extends Controller
         security: [["sanctum" => []]],
         tags: ["Pedidos"]
     )]
+    #[OA\Parameter(name: "page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
+    #[OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer"))]
     #[OA\Response(response: 200, description: "Lista de pedidos con pago pendiente")]
-    public function pagoPendiente()
+    public function pagoPendiente(Request $request)
     {
-        $pedidos = Pedido::with('cliente')
-            ->where('estado_pago', 'Pendiente')
-            ->orderBy('prioridad', 'asc')
-            ->orderBy('fecha_pedido', 'asc')
-            ->get();
+        $perPage = $request->query('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
 
-        return response()->json($pedidos);
+        $pedidos = $this->pedidoService->getPagoPendiente($perPage);
+
+        return response()->json([
+            'data' => $pedidos->items(),
+            'meta' => [
+                'current_page' => $pedidos->currentPage(),
+                'per_page' => $pedidos->perPage(),
+                'total' => $pedidos->total(),
+                'last_page' => $pedidos->lastPage(),
+            ]
+        ]);
     }
 
     #[OA\Put(
@@ -414,8 +469,7 @@ class PedidoController extends Controller
     public function actualizarPrioridad(UpdatePrioridadRequest $request, $id)
     {
         $pedido = Pedido::findOrFail($id);
-        $pedido->prioridad = $request->prioridad;
-        $pedido->save();
+        $pedido = $this->pedidoService->actualizarPrioridad($pedido, $request->prioridad);
 
         return response()->json([
             "mensaje" => "Prioridad actualizada",
@@ -442,8 +496,7 @@ class PedidoController extends Controller
     public function actualizarNota(UpdateNotaRequest $request, $id)
     {
         $pedido = Pedido::findOrFail($id);
-        $pedido->nota = $request->nota;
-        $pedido->save();
+        $pedido = $this->pedidoService->actualizarNota($pedido, $request->nota);
 
         return response()->json([
             "mensaje" => "Nota actualizada",
@@ -471,8 +524,7 @@ class PedidoController extends Controller
     public function actualizarDireccion(UpdateDireccionRequest $request, $id)
     {
         $pedido = Pedido::findOrFail($id);
-        $pedido->direccion_entrega = $request->direccion_entrega;
-        $pedido->save();
+        $pedido = $this->pedidoService->actualizarDireccion($pedido, $request->direccion_entrega);
 
         return response()->json([
             "mensaje" => "Dirección actualizada",
@@ -491,8 +543,7 @@ class PedidoController extends Controller
     public function cancelar($id)
     {
         $pedido = Pedido::findOrFail($id);
-        $pedido->estado = 'Cancelado';
-        $pedido->save();
+        $pedido = $this->pedidoService->cancelar($pedido);
 
         return response()->json([
             "mensaje" => "Pedido cancelado",

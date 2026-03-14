@@ -30,23 +30,32 @@ class PedidoTest extends TestCase
             ->getJson('/api/pedidos');
 
         $response->assertStatus(200)
-            ->assertJsonCount(3);
+            ->assertJsonStructure([
+                'data',
+                'meta' => ['current_page', 'per_page', 'total', 'last_page']
+            ]);
+
+        $this->assertCount(3, $response->json('data'));
     }
 
     public function test_list_pedidos_with_filters(): void
     {
+        $cliente = Cliente::factory()->create();
+        
         Pedido::factory()->create([
+            'cliente_id' => $cliente->id,
             'fecha_pedido' => now()->subDay(),
         ]);
         Pedido::factory()->create([
+            'cliente_id' => $cliente->id,
             'fecha_pedido' => now(),
         ]);
 
         $response = $this->actingAs($this->user, 'sanctum')
             ->getJson('/api/pedidos?desde=' . now()->format('Y-m-d'));
 
-        $response->assertStatus(200)
-            ->assertJsonCount(1);
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('data'));
     }
 
     public function test_create_pedido(): void
@@ -186,41 +195,47 @@ class PedidoTest extends TestCase
 
     public function test_pedidos_priorizados(): void
     {
-        Pedido::factory()->create(['prioridad' => 3]);
-        Pedido::factory()->create(['prioridad' => 1]);
-        Pedido::factory()->create(['prioridad' => 2]);
+        $cliente = Cliente::factory()->create();
+        
+        Pedido::factory()->create(['cliente_id' => $cliente->id, 'prioridad' => 3]);
+        Pedido::factory()->create(['cliente_id' => $cliente->id, 'prioridad' => 1]);
+        Pedido::factory()->create(['cliente_id' => $cliente->id, 'prioridad' => 2]);
 
         $response = $this->actingAs($this->user, 'sanctum')
             ->getJson('/api/pedidos/priorizados');
 
         $response->assertStatus(200);
         
-        $pedidos = $response->json();
+        $pedidos = $response->json('data');
         $this->assertEquals(1, $pedidos[0]['prioridad']);
     }
 
     public function test_pedidos_hoy(): void
     {
-        Pedido::factory()->create(['fecha_pedido' => now()]);
-        Pedido::factory()->create(['fecha_pedido' => now()->subDay()]);
+        $cliente = Cliente::factory()->create();
+        
+        Pedido::factory()->create(['cliente_id' => $cliente->id, 'fecha_pedido' => now()]);
+        Pedido::factory()->create(['cliente_id' => $cliente->id, 'fecha_pedido' => now()->subDay()]);
 
         $response = $this->actingAs($this->user, 'sanctum')
             ->getJson('/api/pedidos/hoy');
 
-        $response->assertStatus(200)
-            ->assertJsonCount(1);
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('data'));
     }
 
     public function test_pedidos_pago_pendiente(): void
     {
-        Pedido::factory()->create(['estado_pago' => 'Pendiente']);
-        Pedido::factory()->create(['estado_pago' => 'Pagado']);
+        $cliente = Cliente::factory()->create();
+        
+        Pedido::factory()->create(['cliente_id' => $cliente->id, 'estado_pago' => 'Pendiente']);
+        Pedido::factory()->create(['cliente_id' => $cliente->id, 'estado_pago' => 'Pagado']);
 
         $response = $this->actingAs($this->user, 'sanctum')
             ->getJson('/api/pedidos/pago-pendiente');
 
-        $response->assertStatus(200)
-            ->assertJsonCount(1);
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('data'));
     }
 
     public function test_crear_pedido_completo(): void
