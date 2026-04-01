@@ -80,6 +80,9 @@ class AuthController extends Controller
             ]);
         }
 
+        $user->load(['roles', 'permissions']);
+        $user->all_permissions = $user->getAllPermissions()->pluck('name');
+
         return response()->json([
             'user' => $user,
             'token' => $user->createToken('API Token')->plainTextToken
