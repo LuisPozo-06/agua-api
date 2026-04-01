@@ -21,6 +21,7 @@ class Pedido extends Model
         'estado_pago',
         'estado_pago_updated_at',
         'comprobante_url',
+        'chofer_id',
     ];
 
     protected $casts = [
@@ -32,5 +33,10 @@ class Pedido extends Model
     public function cliente()
     {
         return $this->belongsTo(Cliente::class);
+    }
+
+    public function chofer()
+    {
+        return $this->belongsTo(Chofer::class);
     }
 }

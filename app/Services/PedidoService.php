@@ -79,6 +79,43 @@ class PedidoService
         $pedido->estado = $estado;
         $pedido->estado_updated_at = now();
         $pedido->save();
+
+        if (in_array($estado, ['Entregado', 'Cancelado']) && $pedido->chofer_id) {
+            $chofer = $pedido->chofer;
+            if ($chofer) {
+                $chofer->estado_asignacion = 'disponible';
+                $chofer->save();
+            }
+        }
+
+        return $pedido;
+    }
+
+    public function asignarChofer(Pedido $pedido, int $choferId): Pedido
+    {
+        $chofer = \App\Models\Chofer::findOrFail($choferId);
+
+        if (!$chofer->is_active || $chofer->estado_asignacion !== 'disponible') {
+            throw new \Exception('El chofer seleccionado no está disponible.');
+        }
+
+        // Liberar al chofer anterior si se está reasignando
+        if ($pedido->chofer_id && $pedido->chofer_id !== $choferId) {
+            $choferAnterior = $pedido->chofer;
+            if ($choferAnterior) {
+                $choferAnterior->estado_asignacion = 'disponible';
+                $choferAnterior->save();
+            }
+        }
+
+        $pedido->chofer_id = $chofer->id;
+        $pedido->estado = 'En proceso'; // Opcional, dependiendo de la regla de negocio
+        $pedido->estado_updated_at = now();
+        $pedido->save();
+
+        $chofer->estado_asignacion = 'ocupado';
+        $chofer->save();
+
         return $pedido;
     }
 

@@ -550,4 +550,41 @@ class PedidoController extends Controller
             "pedido" => $pedido
         ]);
     }
+    #[OA\Put(
+        path: "/api/pedidos/{id}/asignar-chofer",
+        summary: "Asignar chofer a un pedido",
+        security: [["sanctum" => []]],
+        tags: ["Pedidos"]
+    )]
+    #[OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "integer"))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["chofer_id"],
+            properties: [
+                new OA\Property(property: "chofer_id", type: "integer", example: 1)
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: "Chofer asignado correctamente")]
+    public function asignarChofer(Request $request, $id)
+    {
+        $request->validate([
+            'chofer_id' => 'required|exists:chofers,id'
+        ]);
+
+        $pedido = Pedido::findOrFail($id);
+
+        try {
+            $pedido = $this->pedidoService->asignarChofer($pedido, $request->chofer_id);
+            return response()->json([
+                "mensaje" => "Chofer asignado correctamente",
+                "pedido" => $pedido->load('chofer')
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                "mensaje" => $e->getMessage()
+            ], 400);
+        }
+    }
 }

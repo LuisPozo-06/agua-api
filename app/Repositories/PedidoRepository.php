@@ -10,7 +10,7 @@ class PedidoRepository
 {
     public function getAll(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Pedido::with('cliente');
+        $query = Pedido::with(['cliente', 'chofer']);
 
         if (isset($filters['desde'])) {
             $query->whereDate('fecha_pedido', '>=', $filters['desde']);
@@ -33,7 +33,7 @@ class PedidoRepository
 
     public function getByEstado(string $estado, int $perPage = 15): LengthAwarePaginator
     {
-        return Pedido::with('cliente')
+        return Pedido::with(['cliente', 'chofer'])
             ->where('estado', $estado)
             ->orderBy('prioridad', 'asc')
             ->orderBy('fecha_pedido', 'asc')
@@ -42,7 +42,7 @@ class PedidoRepository
 
     public function getPendientes(int $perPage = 15): LengthAwarePaginator
     {
-        return Pedido::with('cliente')
+        return Pedido::with(['cliente', 'chofer'])
             ->where('estado', 'Pendiente')
             ->orderBy('prioridad', 'asc')
             ->orderBy('fecha_pedido', 'asc')
@@ -51,7 +51,7 @@ class PedidoRepository
 
     public function getPriorizados(int $perPage = 15): LengthAwarePaginator
     {
-        return Pedido::with('cliente')
+        return Pedido::with(['cliente', 'chofer'])
             ->orderBy('prioridad', 'asc')
             ->orderBy('fecha_pedido', 'asc')
             ->paginate($perPage);
@@ -59,7 +59,7 @@ class PedidoRepository
 
     public function getHoy(int $perPage = 15): LengthAwarePaginator
     {
-        return Pedido::with('cliente')
+        return Pedido::with(['cliente', 'chofer'])
             ->whereDate('fecha_pedido', now()->toDateString())
             ->orderBy('prioridad', 'asc')
             ->orderBy('fecha_pedido', 'asc')
@@ -68,7 +68,7 @@ class PedidoRepository
 
     public function getPagoPendiente(int $perPage = 15): LengthAwarePaginator
     {
-        return Pedido::with('cliente')
+        return Pedido::with(['cliente', 'chofer'])
             ->where('estado_pago', 'Pendiente')
             ->orderBy('prioridad', 'asc')
             ->orderBy('fecha_pedido', 'asc')
@@ -77,7 +77,7 @@ class PedidoRepository
 
     public function getByPrioridad(int $nivel, int $perPage = 15): LengthAwarePaginator
     {
-        return Pedido::with('cliente')
+        return Pedido::with(['cliente', 'chofer'])
             ->where('prioridad', $nivel)
             ->orderBy('fecha_pedido', 'asc')
             ->paginate($perPage);
@@ -85,7 +85,7 @@ class PedidoRepository
 
     public function findById(int $id): ?Pedido
     {
-        return Pedido::with('cliente')->find($id);
+        return Pedido::with(['cliente', 'chofer'])->find($id);
     }
 
     public function create(array $data): Pedido
