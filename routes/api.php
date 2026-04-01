@@ -36,8 +36,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/pedidos/{id}/nota', [PedidoController::class, 'actualizarNota']);
     Route::put('/pedidos/{id}/direccion', [PedidoController::class, 'actualizarDireccion']);
     Route::put('/pedidos/{id}/cancelar', [PedidoController::class, 'cancelar']);
+    Route::put('/pedidos/{id}/asignar-chofer', [PedidoController::class, 'asignarChofer']);
     Route::put('/pedidos/{id}/estado-pago', [PedidoController::class, 'actualizarEstadoPago']);
     Route::post('/pedidos/{id}/comprobante', [PedidoController::class, 'guardarComprobante']);
+
+    // Rutas de Choferes
+    Route::apiResource('choferes', \App\Http\Controllers\ChoferController::class);
+
+    // Rutas de Usuarios y Permisos
+    Route::apiResource('usuarios', \App\Http\Controllers\UserController::class);
+    Route::get('/permisos', [\App\Http\Controllers\UserController::class, 'permisos']);
 
     // Cloudinary firma
     Route::post('/cloudinary/firma', [CloudinaryController::class, 'generarFirma']);
